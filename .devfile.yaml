@@ -19,7 +19,7 @@ components:
   # Main Python development container (Red Hat UBI)
   - name: python-dev
     container:
-      image: registry.access.redhat.com/ubi9/python-311:latest
+      image: registry.redhat.io/devspaces/udi-rhel9:latest
       memoryRequest: 1Gi
       memoryLimit: 2Gi
       cpuRequest: 500m
