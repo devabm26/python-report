@@ -239,10 +239,3 @@ events:
   preStop:
     - "echo 'Workspace stopping. Remember to commit your changes!'"
 
-# Starter projects (optional)
-starterProjects:
-  - name: enterprise-python-template
-    description: Enterprise Python application with security guardrails
-    git:
-      remotes:
-        origin: <YOUR_GIT_REPOSITORY_URL>
