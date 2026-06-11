@@ -50,7 +50,7 @@ components:
       # Volume mounts
       volumeMounts:
         - name: venv
-          path: /home/default/.venv
+          path: /home/user/.venv
 
   # PostgreSQL database for local development (optional)
   - name: postgres
@@ -101,8 +101,8 @@ commands:
     exec:
       component: python-dev
       commandLine: |
-        python -m venv /home/default/.venv && \
-        source /home/default/.venv/bin/activate && \
+        python -m venv /home/user/.venv && \
+        source /home/user/.venv/bin/activate && \
         pip install --upgrade pip && \
         pip install -r requirements.txt
       workingDir: ${PROJECT_SOURCE}
@@ -126,7 +126,7 @@ commands:
     exec:
       component: python-dev
       commandLine: |
-        source /home/default/.venv/bin/activate && \
+        source /home/user/.venv/bin/activate && \
         echo "=== Scanning for hardcoded secrets ===" && \
         detect-secrets scan --all-files && \
         echo "=== Scanning dependencies for CVEs ===" && \
@@ -143,7 +143,7 @@ commands:
     exec:
       component: python-dev
       commandLine: |
-        source /home/default/.venv/bin/activate && \
+        source /home/user/.venv/bin/activate && \
         pytest tests/test_security.py -v --tb=short
       workingDir: ${PROJECT_SOURCE}
       group:
@@ -155,7 +155,7 @@ commands:
     exec:
       component: python-dev
       commandLine: |
-        source /home/default/.venv/bin/activate && \
+        source /home/user/.venv/bin/activate && \
         pytest tests/ -v --cov=src --cov-report=term --cov-report=html
       workingDir: ${PROJECT_SOURCE}
       group:
@@ -166,7 +166,7 @@ commands:
     exec:
       component: python-dev
       commandLine: |
-        source /home/default/.venv/bin/activate && \
+        source /home/user/.venv/bin/activate && \
         python -m src.app
       workingDir: ${PROJECT_SOURCE}
       group:
@@ -198,7 +198,7 @@ commands:
     exec:
       component: python-dev
       commandLine: |
-        source /home/default/.venv/bin/activate && \
+        source /home/user/.venv/bin/activate && \
         cyclonedx-py requirements -r requirements.txt -o sbom.json && \
         echo "SBOM generated: sbom.json"
       workingDir: ${PROJECT_SOURCE}
