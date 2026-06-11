@@ -228,14 +228,3 @@ commands:
       group:
         kind: run
 
-# Events that run automatically
-events:
-  # After workspace starts
-  postStart:
-    - install-opencode
-    - install-dependencies
-
-  # Before workspace stops
-  preStop:
-    - "echo 'Workspace stopping. Remember to commit your changes!'"
-
