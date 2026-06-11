@@ -63,22 +63,13 @@ commands:
   # Install OpenCode CLI
   - id: install-opencode
     exec:
-      component: python-dev
-      commandLine: |
-        echo "=== Installing OpenCode CLI ===" && \
-        # TODO: Replace with your actual OpenCode installation command
-        # Option 1: If OpenCode is a binary, download it
-        # curl -fsSL <OPENCODE_DOWNLOAD_URL> -o /usr/local/bin/opencode && chmod +x /usr/local/bin/opencode
-        # Option 2: If OpenCode is a Python package
-        # pip install opencode-cli
-        # Option 3: If OpenCode is installed via RPM
-        # dnf install -y opencode-cli
-        echo "CONFIGURE: Update this command with your OpenCode installation method" && \
-        opencode --version || echo "OpenCode installation pending - update install command"
-      workingDir: ${PROJECT_SOURCE}
+      component: tools
+      commandLine: "curl -fsSL https://opencode.ai/install | bash && . ~/.bashrc"
+      workingDir: ${PROJECTS_ROOT}
       group:
         kind: build
-
+        isDefault: true
+  
   # Setup and installation
   - id: install-dependencies
     exec:
@@ -210,4 +201,7 @@ commands:
       workingDir: ${PROJECT_SOURCE}
       group:
         kind: run
+events:
+  postStart:
+    - install-opencode           
 
