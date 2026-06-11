@@ -63,7 +63,7 @@ commands:
   # Install OpenCode CLI
   - id: install-opencode
     exec:
-      component: tools
+      component: python-dev
       commandLine: "curl -fsSL https://opencode.ai/install | bash && . ~/.bashrc"
       workingDir: ${PROJECTS_ROOT}
       group:
