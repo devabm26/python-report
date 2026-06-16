@@ -4,6 +4,9 @@
 # Stage 1: Builder
 FROM registry.access.redhat.com/ubi9/python-311:latest AS builder
 
+# Switch to root for package installation
+USER 0
+
 # Install build dependencies
 RUN dnf install -y \
     gcc \
@@ -21,6 +24,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Stage 2: Runtime
 FROM registry.access.redhat.com/ubi9/python-311:latest
+
+# Switch to root for package installation
+USER 0
 
 # Install runtime dependencies only
 RUN dnf install -y \
