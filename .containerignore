@@ -1,0 +1,47 @@
+# =============================================================================
+# .containerignore — excluded from the podman/buildah build context
+# Keeps the image lean and prevents secrets or dev files leaking in.
+# =============================================================================
+
+# Version control
+.git/
+.gitignore
+
+# Secrets — NEVER copy into an image (specs/deployment/dockerfile.spec REQ-3)
+.env
+.env.*
+!config/.env.example
+
+# Documentation
+*.md
+docs/
+specs/
+
+# Tests — not needed at runtime
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Python byte-code cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Editor / IDE artefacts
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# CI / build artefacts
+*.log
+sbom.json
+dist/
+build/
+*.egg-info/
+
+# Dev containers
+.devfile.yaml
+.devspaces/

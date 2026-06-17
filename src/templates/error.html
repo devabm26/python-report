@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Error – Thoughts Dashboard{% endblock %}
+
+{% block content %}
+<div class="error-page">
+  <h2>Something went wrong</h2>
+  {# message is a safe string set by the error handler, NOT user input #}
+  <p>{{ message }}</p>
+  <a href="{{ url_for('index') }}" class="btn">Return to Dashboard</a>
+</div>
+{% endblock %}

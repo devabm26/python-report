@@ -5,26 +5,27 @@
 # - Scan for CVEs: pip-audit -r requirements.txt
 # - Generate SBOM: cyclonedx-py requirements -r requirements.txt -o sbom.json
 # - Update monthly (security patches immediately)
-#
-# Add your application dependencies below:
 
-# Example structure:
-# # Web Framework
-# Flask==3.0.3
-#
-# # Database
-# psycopg2-binary==2.9.9
-#
-# # Security
-# python-dotenv==1.0.1
-#
-# # Production Server
-# gunicorn==22.0.0
-#
-# # Development & Testing
-# pytest==8.2.2
-# pytest-cov==5.0.0
-# pip-audit==2.7.3
-# detect-secrets==1.4.0
-# bandit==1.7.8
-# cyclonedx-bom==4.5.0
+# Web Framework
+Flask==3.0.3
+
+# CSRF protection (specs/security/web_security.spec REQ-7)
+Flask-WTF==1.2.1
+
+# Database driver — PostgreSQL (specs/architecture/database_layer.spec)
+psycopg2-binary==2.9.9
+
+# Environment variable loading
+python-dotenv==1.0.1
+
+# Production WSGI server (specs/deployment/dockerfile.spec)
+gunicorn==22.0.0
+
+# Security / CI tooling
+pip-audit==2.7.3
+detect-secrets==1.5.0
+bandit==1.7.9
+
+# Testing
+pytest==8.2.2
+pytest-cov==5.0.0

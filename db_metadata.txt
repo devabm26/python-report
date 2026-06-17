@@ -1,0 +1,463 @@
+================================================================================
+DATABASE STRUCTURE METADATA - Positive Thoughts Application
+================================================================================
+Database: PostgreSQL with pgvector extension
+Services: thoughts-backend, thoughts-evaluation
+ORM: Hibernate/Panache
+
+================================================================================
+TABLE: thoughts
+================================================================================
+Description: Core table storing positive thoughts/quotes with ratings
+Owner Service: thoughts-backend
+Package: com.redhat.demos.thoughts.model.Thought
+
+COLUMNS:
+--------
+id
+  Type: UUID
+  Constraints: PRIMARY KEY, NOT NULL, NOT UPDATABLE
+  Description: Unique identifier for the thought
+  Generation: Auto-generated UUID
+
+content
+  Type: VARCHAR(500)
+  Constraints: NOT NULL, LENGTH(10-500)
+  Description: The actual thought/quote text
+  Validation: Must be between 10 and 500 characters, cannot be blank
+
+thumbs_up
+  Type: INTEGER
+  Constraints: NOT NULL
+  Default: 0
+  Description: Count of positive ratings received
+
+thumbs_down
+  Type: INTEGER
+  Constraints: NOT NULL
+  Default: 0
+  Description: Count of negative ratings received
+
+status
+  Type: VARCHAR (ENUM)
+  Constraints: NOT NULL
+  Values: APPROVED, REJECTED, REMOVED, IN_REVIEW
+  Default: IN_REVIEW
+  Description: Current approval/review status of the thought
+
+author
+  Type: VARCHAR(200)
+  Constraints: NOT NULL, MAX_LENGTH(200)
+  Default: "Unknown"
+  Description: Name of the thought author
+
+author_bio
+  Type: VARCHAR(200)
+  Constraints: NOT NULL, MAX_LENGTH(200)
+  Default: "Unknown"
+  Description: Brief biography of the author
+
+created_at
+  Type: TIMESTAMP
+  Constraints: NOT NULL, NOT UPDATABLE
+  Description: Timestamp when the thought was created
+  Generation: Auto-set on insert (PrePersist)
+
+updated_at
+  Type: TIMESTAMP
+  Constraints: NOT NULL
+  Description: Timestamp when the thought was last updated
+  Generation: Auto-updated on every modification (PreUpdate)
+
+INDEXES:
+--------
+PRIMARY KEY: id
+
+BUSINESS LOGIC:
+---------------
+- Random thought selection: Custom method `findRandom()` selects a random thought using count-based pagination
+- Default status on creation: IN_REVIEW
+- Default author/bio: "Unknown" if not provided
+- Timestamps: Auto-managed via @PrePersist and @PreUpdate lifecycle hooks
+
+SEED DATA:
+----------
+- import.sql contains 100+ pre-seeded motivational quotes from various authors
+- All seed data created with status=APPROVED and zero ratings
+
+================================================================================
+TABLE: thought_evaluations
+================================================================================
+Description: AI evaluation results for thoughts with similarity scoring
+Owner Service: thoughts-backend (model), thoughts-evaluation (evaluation logic)
+Package: com.redhat.demos.thoughts.model.ThoughtEvaluation
+
+COLUMNS:
+--------
+id
+  Type: UUID
+  Constraints: PRIMARY KEY, NOT NULL, NOT UPDATABLE
+  Description: Unique identifier for the evaluation record
+  Generation: Auto-generated UUID
+
+thought_id
+  Type: UUID
+  Constraints: NOT NULL, FOREIGN KEY
+  References: thoughts(id)
+  Description: Reference to the evaluated thought
+
+status
+  Type: VARCHAR (ENUM)
+  Constraints: NOT NULL
+  Values: APPROVED, REJECTED, REMOVED, IN_REVIEW
+  Description: Evaluation result status determined by AI similarity check
+
+similarity_score
+  Type: NUMERIC(5,4)
+  Constraints: NOT NULL
+  Precision: 5 digits total, 4 decimal places
+  Range: 0.0000 to 9.9999 (typically 0.0000 to 1.0000 for cosine similarity)
+  Description: Cosine similarity score from vector comparison
+
+evaluated_at
+  Type: TIMESTAMP
+  Constraints: NOT NULL, NOT UPDATABLE
+  Description: Timestamp when the evaluation was performed
+  Generation: Auto-set on insert (PrePersist)
+
+metadata
+  Type: JSONB
+  Constraints: NULL allowed
+  Description: Additional evaluation metadata in JSON format
+  Usage: Stores flexible metadata about the evaluation process
+
+RELATIONSHIPS:
+--------------
+thought (ManyToOne, LAZY):
+  Join Column: thought_id
+  Target: Thought entity
+  Description: Navigation property to the evaluated thought
+
+INDEXES:
+--------
+PRIMARY KEY: id
+FOREIGN KEY: thought_id -> thoughts(id)
+idx_thought_evaluations_thought_id: ON thought_id (B-tree index for fast thought lookup)
+idx_thought_evaluations_status: ON status (B-tree index for filtering by evaluation status)
+
+BUSINESS LOGIC:
+---------------
+- Evaluation timestamp auto-set via @PrePersist
+- Multiple evaluation records can exist for the same thought_id
+- Metadata field stores flexible JSON data about the evaluation process
+- Similarity threshold default: 0.85 (scores above this for NEGATIVE vectors = REJECTED status)
+
+NOTES:
+------
+- This table exists in both services' models (thoughts-backend for reading, thoughts-evaluation for writing)
+- Created via Flyway migration V2__create_thought_evaluations_table.sql in evaluation service
+
+================================================================================
+TABLE: evaluation_vectors
+================================================================================
+Description: Reference vector embeddings for positive/negative classification
+Owner Service: thoughts-evaluation
+Package: com.redhat.demos.evaluation.model.EvaluationVector
+
+COLUMNS:
+--------
+id
+  Type: UUID
+  Constraints: PRIMARY KEY, NOT NULL, NOT UPDATABLE
+  Description: Unique identifier for the vector record
+  Generation: Auto-generated UUID
+
+embedding
+  Type: VECTOR (pgvector extension type)
+  Storage: Custom float[] array stored as pgvector type
+  Constraints: NULL allowed
+  Description: Vector embedding representation for similarity comparison
+  Notes: Uses VectorConverter and ColumnTransformer for type conversion
+
+vector_type
+  Type: VARCHAR (ENUM)
+  Constraints: NOT NULL
+  Values: POSITIVE, NEGATIVE
+  Description: Classification type this vector represents
+
+label
+  Type: VARCHAR(255)
+  Constraints: NOT NULL, LENGTH(1-255)
+  Description: Human-readable label for the reference vector
+  Validation: Must be between 1 and 255 characters
+
+created_at
+  Type: TIMESTAMP
+  Constraints: NOT NULL, NOT UPDATABLE
+  Description: Timestamp when the vector was created
+  Generation: Auto-set on insert (PrePersist)
+
+INDEXES:
+--------
+PRIMARY KEY: id
+idx_evaluation_vectors_type: ON vector_type (B-tree index for filtering by POSITIVE/NEGATIVE type)
+
+BUSINESS LOGIC:
+---------------
+- Vectors are initialized via POST /vectors/initialize endpoint
+- Requires pgvector extension to be installed
+- Used as reference embeddings for cosine similarity comparison
+- Typical setup: 2-10 POSITIVE examples, 2-10 NEGATIVE examples
+
+NOTES:
+------
+- Vector dimension depends on embedding model (nomic-embed-text: 768 dimensions)
+- Created via Flyway migration V1__create_evaluation_vectors_table.sql
+- Migration V4__migrate_to_pgvector.sql converts from JSONB to native pgvector type
+
+================================================================================
+ENUMERATIONS
+================================================================================
+
+ThoughtStatus (com.redhat.demos.thoughts.model.ThoughtStatus)
+  Values:
+    - APPROVED: Thought has passed evaluation and is approved for display
+    - REJECTED: Thought did not pass evaluation criteria
+    - REMOVED: Thought was manually removed or flagged
+    - IN_REVIEW: Thought is pending evaluation (default state)
+
+  Used In:
+    - thoughts.status
+    - thought_evaluations.status
+
+VectorType (com.redhat.demos.evaluation.model.VectorType)
+  Values:
+    - POSITIVE: Reference vector for positive thought classification
+    - NEGATIVE: Reference vector for negative thought classification
+
+  Used In:
+    - evaluation_vectors.vector_type
+
+================================================================================
+RELATIONSHIPS SUMMARY
+================================================================================
+
+thoughts (1) <---> (N) thought_evaluations
+  Type: One-to-Many
+  Foreign Key: thought_evaluations.thought_id -> thoughts.id
+  Description: A thought can have multiple evaluation records
+
+================================================================================
+DATA FLOW
+================================================================================
+
+1. Thought Creation:
+   thoughts-backend -> thoughts table (status=IN_REVIEW)
+   -> Kafka event (thoughts.events topic)
+
+2. AI Evaluation:
+   Kafka consumer (thoughts-evaluation) -> generates embedding
+   -> compares with evaluation_vectors
+   -> creates thought_evaluations record
+   -> updates thoughts.status based on similarity_score
+
+3. Rating Flow:
+   Frontend/Admin -> thoughts-backend API
+   -> updates thoughts.thumbs_up or thoughts.thumbs_down
+
+================================================================================
+DATABASE CONFIGURATION
+================================================================================
+
+Development Mode:
+  - Auto-provisioned via Quarkus Dev Services
+  - Hibernate: drop-and-create mode
+  - Image: postgres:17 (backend), pgvector/pgvector:pg17 (evaluation)
+
+Production Mode:
+  - Host: postgresql.thoughts-app.svc.cluster.local (OpenShift)
+  - Database: thoughts
+  - Migration: Flyway (evaluation service only)
+  - Extensions: pgvector (required for evaluation_vectors)
+
+================================================================================
+SAMPLE QUERIES FOR REPORTING
+================================================================================
+
+1. GET ALL THOUGHTS WITH THEIR LATEST EVALUATION STATUS
+   Query Pattern: JOIN thoughts with thought_evaluations on thought_id
+   Order By: evaluated_at DESC to get latest evaluation per thought
+   Columns: thought.id, content, author, author_bio, status, similarity_score,
+            thumbs_up, thumbs_down, evaluated_at
+
+2. SUMMARY STATISTICS BY STATUS
+   Aggregate: COUNT(*) GROUP BY status
+   Tables: thoughts
+   Metrics: Total APPROVED, REJECTED, REMOVED, IN_REVIEW counts
+
+3. TOP RATED THOUGHTS
+   Order By: thumbs_up DESC or (thumbs_up - thumbs_down) DESC
+   Filter: WHERE status = 'APPROVED'
+   Limit: Top 10 or 20
+
+4. EVALUATION STATISTICS
+   Aggregate: AVG(similarity_score), MIN(similarity_score), MAX(similarity_score)
+   Group By: status
+   Table: thought_evaluations
+
+5. THOUGHTS PENDING EVALUATION
+   Filter: WHERE status = 'IN_REVIEW' AND id NOT IN (SELECT thought_id FROM thought_evaluations)
+   Purpose: Find thoughts that haven't been evaluated yet
+
+6. AUTHOR PERFORMANCE
+   Aggregate: COUNT(*), AVG(thumbs_up), AVG(similarity_score)
+   Group By: author
+   Join: thoughts LEFT JOIN thought_evaluations ON thoughts.id = thought_id
+
+7. EVALUATION VECTOR INVENTORY
+   Aggregate: COUNT(*) GROUP BY vector_type
+   Table: evaluation_vectors
+   Purpose: Verify reference vectors are initialized (should have POSITIVE and NEGATIVE examples)
+
+================================================================================
+EXAMPLE REPORT DATA STRUCTURE
+================================================================================
+
+REPORT: Thoughts Dashboard Summary
+
+Sample Output Format (JSON):
+{
+  "summary": {
+    "total_thoughts": 300,
+    "approved": 245,
+    "rejected": 30,
+    "in_review": 15,
+    "removed": 10
+  },
+  "top_rated": [
+    {
+      "id": "uuid-here",
+      "content": "Quote text...",
+      "author": "Author Name",
+      "author_bio": "Brief bio",
+      "thumbs_up": 150,
+      "thumbs_down": 5,
+      "net_rating": 145,
+      "status": "APPROVED"
+    }
+  ],
+  "evaluation_stats": {
+    "approved": {
+      "count": 245,
+      "avg_similarity_score": 0.3421,
+      "min_similarity_score": 0.0012,
+      "max_similarity_score": 0.7234
+    },
+    "rejected": {
+      "count": 30,
+      "avg_similarity_score": 0.8921,
+      "min_similarity_score": 0.8501,
+      "max_similarity_score": 0.9834
+    }
+  },
+  "author_performance": [
+    {
+      "author": "Charles Bukowski",
+      "total_thoughts": 5,
+      "approved_count": 4,
+      "rejected_count": 1,
+      "avg_thumbs_up": 45.2,
+      "avg_similarity_score": 0.4521
+    }
+  ],
+  "vectors_initialized": {
+    "positive_count": 5,
+    "negative_count": 5,
+    "total": 10,
+    "status": "ready"
+  }
+}
+
+REPORT: Detailed Thought Listing
+
+Sample Output Format (Tabular):
+| ID | Content | Author | Status | Thumbs Up | Thumbs Down | Net | Similarity | Evaluated At |
+|----|---------|--------|--------|-----------|-------------|-----|------------|--------------|
+| uuid | Quote... | Name | APPROVED | 45 | 2 | 43 | 0.3421 | 2026-06-03 10:15:23 |
+
+================================================================================
+COMMON AGGREGATIONS FOR DASHBOARDS
+================================================================================
+
+Metric: Total Thoughts Count
+  Query: SELECT COUNT(*) FROM thoughts
+
+Metric: Approval Rate
+  Query: SELECT (COUNT(*) FILTER (WHERE status='APPROVED')::float / COUNT(*)) * 100
+         FROM thoughts
+
+Metric: Average Rating Per Thought
+  Query: SELECT AVG(thumbs_up - thumbs_down) FROM thoughts WHERE status='APPROVED'
+
+Metric: Evaluation Accuracy (thoughts with evaluations)
+  Query: SELECT COUNT(DISTINCT thought_id)::float / (SELECT COUNT(*) FROM thoughts) * 100
+         FROM thought_evaluations
+
+Metric: Recent Activity (last 24 hours)
+  Query: SELECT COUNT(*) FROM thoughts
+         WHERE created_at > NOW() - INTERVAL '24 hours'
+
+Metric: Quality Score Distribution
+  Query: SELECT
+           CASE
+             WHEN similarity_score < 0.5 THEN 'High Quality (Low Negative Similarity)'
+             WHEN similarity_score < 0.85 THEN 'Medium Quality'
+             ELSE 'Low Quality (High Negative Similarity)'
+           END as quality_band,
+           COUNT(*)
+         FROM thought_evaluations
+         GROUP BY quality_band
+
+================================================================================
+DATA INTERPRETATION NOTES
+================================================================================
+
+Similarity Scores:
+  - Range: 0.0 to 1.0 (cosine similarity)
+  - Low scores (0.0 - 0.5): Thought is dissimilar to NEGATIVE reference vectors = GOOD
+  - High scores (0.85+): Thought is similar to NEGATIVE reference vectors = BAD/REJECTED
+  - Threshold: Default 0.85 determines APPROVED vs REJECTED status
+
+Thought Status:
+  - IN_REVIEW: New thought, not yet evaluated by AI
+  - APPROVED: Passed AI evaluation (similarity_score < threshold)
+  - REJECTED: Failed AI evaluation (similarity_score >= threshold)
+  - REMOVED: Manually flagged/removed by admin
+
+Ratings:
+  - thumbs_up: Positive user feedback count
+  - thumbs_down: Negative user feedback count
+  - Net rating: thumbs_up - thumbs_down (can be negative)
+
+Timestamps:
+  - created_at: When thought was first added to system
+  - updated_at: Last modification time (any field change)
+  - evaluated_at: When AI evaluation was performed
+
+================================================================================
+TECHNICAL NOTES
+================================================================================
+
+- All primary keys use UUID v4 for distributed system compatibility
+- Timestamp fields use LocalDateTime (timezone-agnostic, no timezone info stored)
+- Default values are set via @PrePersist lifecycle hooks in Java entities
+- thoughts-backend owns the schema in dev mode (drop-and-create)
+- thoughts-evaluation uses Flyway migrations for pgvector setup
+- JSONB type in thought_evaluations.metadata allows flexible metadata storage
+- Vector embeddings dimension: 768 (for nomic-embed-text model)
+- Embedding model: nomic-embed-text (default, configurable)
+- Similarity threshold: 0.85 (configurable via EVALUATION_SIMILARITY_THRESHOLD)
+- Cosine similarity is used for vector comparison (not Euclidean distance)
+- pgvector extension required for evaluation_vectors table
+
+================================================================================
